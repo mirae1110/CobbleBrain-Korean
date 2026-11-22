@@ -1,0 +1,10 @@
+{
+  "schemaVersion": 1,
+  "id": "cobblebrain_korean_addon",
+  "version": "${version}",
+  "name": "CobbleBrain Korean Chat Addon (Prototype)",
+  "description": "Client-side Korean text postprocessing of selected CobbleBrain chat messages",
+  "environment": "client",
+  "depends": {"fabricloader": ">=0.16.0", "minecraft": "1.21.1", "java": ">=21", "cobblebrain": "Fabric-1.6.1"},
+  "mixins": ["cobblebrain-ko.mixins.json"]
+}
