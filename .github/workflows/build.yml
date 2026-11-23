@@ -2,16 +2,16 @@
 name: Build CobbleBrain Korean Addon
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+  push:
+    branches: [main, master]
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up Java 21
@@ -25,13 +25,24 @@ jobs:
         with:
           gradle-version: '8.10.2'
 
-      - name: Build Fabric addon
+      - name: Fetch Cobblemon translation data
+        run: |
+          mkdir -p build/translation
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/codemonkey85/Cobblemon-Mirror/main/common/src/main/resources/assets/cobblemon/lang/en_us.json \
+            -o build/translation/en_us.json
+          curl --fail --location --retry 3 --silent --show-error \
+            https://raw.githubusercontent.com/codemonkey85/Cobblemon-Mirror/main/common/src/main/resources/assets/cobblemon/lang/ko_kr.json \
+            -o build/translation/ko_kr.json
+          python3 scripts/generate_species.py build/translation/en_us.json build/translation/ko_kr.json src/main/resources/pokemon_names.tsv
+
+      - name: Build Fabric mod
         run: gradle build --stacktrace
 
-      - name: Upload JAR
+      - name: Upload built mod
         if: success()
         uses: actions/upload-artifact@v4
         with:
-          name: CobbleBrain-Korean-Addon
+          name: CobbleBrain-Korean-Addon-0.2.0
           path: build/libs/*.jar
           if-no-files-found: error
