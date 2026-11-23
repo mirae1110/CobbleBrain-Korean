@@ -1,48 +1,60 @@
 package kr.cobblebrain.ko;
 
-import java.util.LinkedHashMap;
+import java.io.BufferedReader;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-/** Translators for CobbleBrain-produced chat lines. Other mods' chat should pass untouched. */
+/** Only affects visible chat strings, NEVER CobbleBrain AI's internal identifiers. */
 public final class KoreanText {
     private KoreanText() {}
-    private static final Map<String, String> SPECIES = new LinkedHashMap<>();
+    private static final Map<String, String> SPECIES = new HashMap<>();
     private static final Pattern FRIENDSHIP = Pattern.compile("^Friendship\\s+(.+?):\\s*([+-]\\d+)\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern SCOUT_SPOT = Pattern.compile("^(.+?) spotted a (.+?) at (X:[^\\s]+\\s+Y:[^\\s]+\\s+Z:[^\\s]+)\\.?$", Pattern.CASE_INSENSITIVE);
     private static final Pattern SCOUT_DONE = Pattern.compile("^(.+?) completed its reconnaissance\\.$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern POKEMON_CHAT = Pattern.compile("^([A-Za-z][A-Za-z .'-]{1,40}):\\s*(.+)$");
+    private static final Pattern POKEMON_CHAT = Pattern.compile("^([^:]{1,80}):\\s*(.+)$", Pattern.DOTALL);
+
     static {
-        SPECIES.put("Torchic", "아차모");
-        SPECIES.put("Staravia", "찌르버드");
-        SPECIES.put("Staraptor", "찌르호크");
-        SPECIES.put("Starly", "찌르꼬");
-        SPECIES.put("Absol", "앱솔");
-        SPECIES.put("Metagross", "메타그로스");
-        SPECIES.put("Charizard", "리자몽");
-        SPECIES.put("Pikachu", "피카츄");
-        SPECIES.put("Bulbasaur", "이상해씨");
-        SPECIES.put("Charmander", "파이리");
-        SPECIES.put("Squirtle", "꼬부기");
-        SPECIES.put("Eevee", "이브이");
-        SPECIES.put("Piplup", "팽도리");
-        SPECIES.put("Meowth", "나옹");
+        try (InputStream in = KoreanText.class.getClassLoader().getResourceAsStream("pokemon_names.tsv")) {
+            if (in != null) {
+                try (BufferedReader reader = new BufferedReader(new InputStreamReader(in, StandardCharsets.UTF_8))) {
+                    String line;
+                    while ((line = reader.readLine()) != null) {
+                        int t = line.indexOf('\t');
+                        if (t < 1) continue;
+                        String en = line.substring(0,t).trim();
+                        String ko = line.substring(t + 1).trim();
+                        if (!en.isEmpty() && !ko.isEmpty()) SPECIES.put(en.toLowerCase(Locale.ROOT), ko);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[CobbleBrain Korean] species dictionary load failed: " + e);
+        }
     }
-    private static String name(String s) { return SPECIES.getOrDefault(s.trim(), s.trim()); }
-    public static String translate(String s) {
-        Matcher m = FRIENDSHIP.matcher(s);
-        if (m.matches()) return name(m.group(1)) + " 친밀도 " + m.group(2);
-        m = SCOUT_SPOT.matcher(s);
-        if (m.matches()) return name(m.group(1)) + " — 정찰 중 발견: " + translatePlace(m.group(2)) + " (" + m.group(3) + ")";
-        m = SCOUT_DONE.matcher(s);
-        if (m.matches()) return name(m.group(1)) + "가 정찰을 마쳤습니다.";
-        m = POKEMON_CHAT.matcher(s);
-        if (m.matches() && SPECIES.containsKey(m.group(1))) return name(m.group(1)) + ": " + m.group(2);
-        return s;
+
+    private static String name(String s) { return SPECIES.getOrDefault(s.trim().toLowerCase(Locale.ROOT), s.trim()); }
+    private static boolean knownName(String s) { return SPECIES.containsKey(s.trim().toLowerCase(Locale.ROOT)); }
+
+    public static String translate(String text) {
+        if (text == null || text.isEmpty()) return text;
+        Matcher m = FRIENDSHIP.matcher(text);
+        if (m.matches() && knownName(m.group(1))) return name(m.group(1)) + " 친밀도 " + m.group(2);
+        m = SCOUT_SPOT.matcher(text);
+        if (m.matches() && knownName(m.group(1))) return name(m.group(1)) + " — 정찰 중 발견: " + translatePlace(m.group(2)) + " (" + m.group(3) + ")";
+        m = SCOUT_DONE.matcher(text);
+        if (m.matches() && knownName(m.group(1))) return name(m.group(1)) + "가 정찰을 마쳤습니다.";
+        m = POKEMON_CHAT.matcher(text);
+        if (m.matches() && knownName(m.group(1))) return name(m.group(1)) + ": " + m.group(2);
+        return text;
     }
     private static String translatePlace(String s) {
-        return switch(s.toLowerCase()) {
+        return switch(s.toLowerCase(Locale.ROOT)) {
             case "shipwreck" -> "난파선";
             case "village" -> "마을";
             case "temple" -> "사원";
